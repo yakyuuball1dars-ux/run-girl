@@ -126,6 +126,18 @@ function drawEnemy(e) {
     ctx.fillRect(e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H);
   }
 }
+function sfxStomp() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(380, t);
+  o.frequency.exponentialRampToValueAtTime(1000, t + 0.12);
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(g); g.connect(masterGain);
+  o.start(t); o.stop(t + 0.2);
+}
 function takeDamage() {
   if (player.hurt > 0) return;
   player.hp--;
@@ -181,7 +193,7 @@ const JUMP_POWER = -13.5;
 // ===== 状態 =====
 let state = 'start';   // start | play | over
 let obstacles = [], coins = [], hills = [], clouds = [], particles = [], enemies = [];
-let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0, enemyT = 0;
+let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0, enemyT = 0, bonus = 0;
 // localStorage は file:// だと例外になることがあるので安全に扱う
 function loadBest() { try { return +(localStorage.getItem('rungirl_best') || 0); } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem('rungirl_best', v); } catch (e) {} }
@@ -199,7 +211,7 @@ function reset() {
   player.jumps = 0; player.hp = 3; player.hurt = 0;
   obstacles = []; coins = []; particles = []; enemies = [];
   speed = 5.2; distance = 0; score = 0; coinCount = 0;
-  spawnT = 60; coinT = 90; animT = 0; enemyT = 140;
+  spawnT = 60; coinT = 90; animT = 0; enemyT = 140; bonus = 0;
 }
 
 function startGame() {
@@ -322,10 +334,19 @@ function update() {
     }
   }
   for (const e of enemies) {
-    if (player.hurt === 0 && hit(px+4, py+4, HIT_W-8, HIT_H-8, e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H)) {
-      takeDamage(); break;
+    if (e.dead) continue;
+    if (!hit(px+4, py+4, HIT_W-8, HIT_H-8, e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H)) continue;
+    if (player.vy > 0 && player.feetY < GROUND - ENEMY_H + ENEMY_H * 0.6) {
+      e.dead = true; bonus += 30;
+      player.vy = -12; player.onGround = false;       // 踏んでバウンド
+      sfxStomp();
+      for (let k = 0; k < 14; k++)
+        particles.push({ x: e.x + ENEMY_W/2, y: GROUND - ENEMY_H, vx: (Math.random()-.5)*6, vy: -Math.random()*4, life: 26, c: '#b070ff' });
+    } else if (player.hurt === 0) {
+      takeDamage();
     }
   }
+  enemies = enemies.filter(e => !e.dead);
   for (const c of coins) {
     if (hit(px, py, HIT_W, HIT_H, c.x - c.r, c.y - c.r, c.r*2, c.r*2)) {
       c.got = true; coinCount++; score += 10;
@@ -333,7 +354,7 @@ function update() {
         particles.push({ x: c.x, y: c.y, vx: (Math.random()-.5)*4, vy: -Math.random()*3, life: 22, c: '#ffd166' });
     }
   }
-  score = coinCount * 10 + Math.floor(distance / 10);
+  score = coinCount * 10 + bonus + Math.floor(distance / 10);
 }
 
 // ===== 描画 =====
@@ -490,22 +511,22 @@ function loop() { update(); draw(); requestAnimationFrame(loop); }
 let audioCtx = null, masterGain = null, bgmTimer = null, bgmStep = 0, bgmOn = true;
 function midi(n) { return 440 * Math.pow(2, (n - 69) / 12); }
 const MELODY = [
-  74,74,69,71, 74,0,71,69,
-  67,67,69,71, 69,0,0,0,
-  73,73,71,73, 74,0,76,74,
-  71,69,67,69, 69,0,0,0,
-  69,71,73,74, 76,0,74,73,
-  71,73,74,76, 78,0,76,74,
-  74,76,78,79, 81,0,0,79,
-  78,76,74,73, 74,0,0,0
+  69,69,69,74, 74,74,0,74,
+  76,74,73,74, 69,0,0,0,
+  69,69,69,76, 76,76,0,74,
+  78,76,74,73, 74,0,0,0,
+  74,76,78,79, 81,0,79,78,
+  79,78,76,74, 76,0,0,0,
+  78,78,76,74, 73,74,76,78,
+  74,0,69,0, 74,0,0,0
 ];
 const CHORDS = [
-  [50,57,62],[50,57,62],[43,50,55],[45,52,57],
-  [47,54,59],[43,50,55],[45,52,57],[50,57,62],
-  [50,57,62],[45,52,57],[47,54,59],[43,50,55],
-  [40,47,52],[45,52,57],[50,57,62],[45,52,57]
+  [50,57,62],[50,57,62],[45,52,57],[50,57,62],
+  [50,57,62],[50,57,62],[45,52,57],[50,57,62],
+  [43,50,55],[50,57,62],[45,52,57],[50,57,62],
+  [47,54,59],[43,50,55],[45,52,57],[50,57,62]
 ];
-const BGM_STEP_MS = 170;
+const BGM_STEP_MS = 140;
 function tone(f, dur, type, vol) {
   if (!audioCtx || f <= 0) return;
   const t = audioCtx.currentTime;
@@ -524,15 +545,13 @@ function bgmTick() {
   const inBar = i % 4;
   const m = MELODY[i];
   if (m > 0) {
-    tone(midi(m), BGM_STEP_MS / 1000 * 1.3, 'square', 0.11);
-    tone(midi(m + 12), BGM_STEP_MS / 1000 * 1.1, 'triangle', 0.05);
+    tone(midi(m), BGM_STEP_MS / 1000 * 1.15, 'square', 0.12);
+    tone(midi(m + 12), BGM_STEP_MS / 1000 * 0.9, 'triangle', 0.045);
   }
   const bassNote = (inBar % 2 === 0) ? chord[0] - 12 : chord[1] - 12;
-  tone(midi(bassNote), BGM_STEP_MS / 1000 * 1.4, 'triangle', 0.18);
-  if (inBar === 0) {
-    for (const c of chord) tone(midi(c), BGM_STEP_MS / 1000 * 3.6, 'sine', 0.05);
-    tone(55, 0.16, 'sine', 0.22);
-  }
+  tone(midi(bassNote), BGM_STEP_MS / 1000 * 1.2, 'triangle', 0.17);
+  if (inBar === 0) { for (const c of chord) tone(midi(c), BGM_STEP_MS / 1000 * 3.0, 'sine', 0.05); }
+  if (inBar % 2 === 0) tone(55, 0.14, 'sine', 0.22);
   bgmStep++;
 }
 function startBGM() {
