@@ -192,7 +192,7 @@ function drawFrame(name, cx, footY, targetH, flip) {
   const scale = targetH / f[3];
   const dw = f[2] * scale, dh = targetH;
   const dx = cx - dw / 2, dy = footY - dh;
-  ctx.imageSmoothingEnabled = !!smooth; ctx.imageSmoothingQuality = 'high';
+  ctx.imageSmoothingEnabled = false;
   if (flip) {
     ctx.save();
     ctx.translate(cx * 2, 0);
