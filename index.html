@@ -118,7 +118,7 @@ const enemy2Img = new Image();
 let enemy2Ready = false;
 enemy2Img.onload = () => enemy2Ready = true;
 enemy2Img.src = 'enemy2.png';
-const ENEMY2 = [[622,325,156,270]]; // 馬汗アブドゥラ（腕組みボスポーズ・顔くっきり）
+const ENEMY2 = [[30,965,132,126],[182,965,130,126],[336,965,128,126]]; const ENEMY2_DISP = 132; // アブ 走り3コマ＋大きめ
 const ENEMY = [[42,605,136,229],[219,605,136,229],[393,605,134,229]]; // 左向き走り3コマ
 const ENEMY_W = 46, ENEMY_H = 78, ENEMY_DISP = 104;
 function drawSprite(img, fr, cx, footY, targetH, flip, smooth) {
@@ -143,7 +143,7 @@ function drawEnemy(e) {
   if (erdy) {
     const fr = efr[Math.floor(animT / 8) % efr.length];
     const bob = Math.abs(Math.sin(animT * 0.3)) * 3;
-    drawSprite(eimg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false, v2);
+    drawSprite(eimg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, v2 ? ENEMY2_DISP : ENEMY_DISP, false, v2);
     // （NGラベルは非表示）
   } else {
     ctx.fillStyle = '#3a2a5a';
