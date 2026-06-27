@@ -121,12 +121,12 @@ enemy2Img.src = 'enemy2.png';
 const ENEMY2 = [[622,325,156,270]]; // 馬汗アブドゥラ（腕組みボスポーズ・顔くっきり）
 const ENEMY = [[42,605,136,229],[219,605,136,229],[393,605,134,229]]; // 左向き走り3コマ
 const ENEMY_W = 46, ENEMY_H = 78, ENEMY_DISP = 104;
-function drawSprite(img, fr, cx, footY, targetH, flip) {
+function drawSprite(img, fr, cx, footY, targetH, flip, smooth) {
   if (!img || !fr) return;
   const scale = targetH / fr[3];
   const dw = fr[2] * scale, dh = targetH;
   const dx = cx - dw / 2, dy = footY - dh;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = !!smooth; ctx.imageSmoothingQuality = 'high';
   if (flip) {
     ctx.save(); ctx.translate(cx * 2, 0); ctx.scale(-1, 1);
     ctx.drawImage(img, fr[0], fr[1], fr[2], fr[3], dx, dy, dw, dh);
@@ -143,7 +143,7 @@ function drawEnemy(e) {
   if (erdy) {
     const fr = efr[Math.floor(animT / 8) % efr.length];
     const bob = Math.abs(Math.sin(animT * 0.3)) * 3;
-    drawSprite(eimg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false);
+    drawSprite(eimg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false, v2);
     // （NGラベルは非表示）
   } else {
     ctx.fillStyle = '#3a2a5a';
@@ -192,7 +192,7 @@ function drawFrame(name, cx, footY, targetH, flip) {
   const scale = targetH / f[3];
   const dw = f[2] * scale, dh = targetH;
   const dx = cx - dw / 2, dy = footY - dh;
-  ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingEnabled = !!smooth; ctx.imageSmoothingQuality = 'high';
   if (flip) {
     ctx.save();
     ctx.translate(cx * 2, 0);
