@@ -118,7 +118,7 @@ const enemy2Img = new Image();
 let enemy2Ready = false;
 enemy2Img.onload = () => enemy2Ready = true;
 enemy2Img.src = 'enemy2.png';
-const ENEMY2 = [[30,965,132,126],[182,965,130,126],[336,965,128,126]]; const ENEMY2_DISP = 110; // アブ 走り3コマ＋大きめ
+const ENEMY2 = [[10,4,63,77]]; const ENEMY2_DISP = 104; // アブ（1枚絵・主人公と同サイズ）
 const ENEMY = [[42,605,136,229],[219,605,136,229],[393,605,134,229]]; // 左向き走り3コマ
 const ENEMY_W = 46, ENEMY_H = 78, ENEMY_DISP = 104;
 function drawSprite(img, fr, cx, footY, targetH, flip, smooth) {
