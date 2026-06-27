@@ -330,7 +330,7 @@ function update() {
   obstacles = obstacles.filter(o => o.x + o.w > -20);
 
   // 敵キャラ（少し速く迫ってくる）
-  if (--enemyT <= 0) { enemies.push({ x: W + 40, ng: NG_LIST[Math.floor(Math.random()*NG_LIST.length)], v: (Math.random()<0.5?1:0) }); enemyT = Math.max(90, 200 - distance / 300); }
+  if (--enemyT <= 0) { enemies.push({ x: W + 40, ng: NG_LIST[Math.floor(Math.random()*NG_LIST.length)], v: 0 }); enemyT = Math.max(90, 200 - distance / 300); }
   enemies.forEach(e => e.x -= speed * 1.18);
   enemies = enemies.filter(e => e.x + ENEMY_W > -20);
 
