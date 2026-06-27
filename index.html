@@ -94,6 +94,48 @@ const overStats   = document.getElementById('overStats');
 const charImg = new Image();
 let charLoaded = false;
 charImg.onload = () => charLoaded = true;
+
+// ===== 敵キャラ（ダークスーツの男） =====
+const enemyImg = new Image();
+let enemyReady = false;
+enemyImg.onload = () => enemyReady = true;
+enemyImg.src = 'enemy.png';
+const ENEMY = [[42,605,136,229],[219,605,136,229],[393,605,134,229]]; // 左向き走り3コマ
+const ENEMY_W = 46, ENEMY_H = 78, ENEMY_DISP = 104;
+function drawSprite(img, fr, cx, footY, targetH, flip) {
+  if (!img || !fr) return;
+  const scale = targetH / fr[3];
+  const dw = fr[2] * scale, dh = targetH;
+  const dx = cx - dw / 2, dy = footY - dh;
+  ctx.imageSmoothingEnabled = false;
+  if (flip) {
+    ctx.save(); ctx.translate(cx * 2, 0); ctx.scale(-1, 1);
+    ctx.drawImage(img, fr[0], fr[1], fr[2], fr[3], dx, dy, dw, dh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(img, fr[0], fr[1], fr[2], fr[3], dx, dy, dw, dh);
+  }
+}
+function drawEnemy(e) {
+  if (enemyReady) {
+    const fr = ENEMY[Math.floor(animT / 8) % ENEMY.length];
+    const bob = Math.abs(Math.sin(animT * 0.3)) * 3;
+    drawSprite(enemyImg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false);
+  } else {
+    ctx.fillStyle = '#3a2a5a';
+    ctx.fillRect(e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H);
+  }
+}
+function takeDamage() {
+  if (player.hurt > 0) return;
+  player.hp--;
+  player.hurt = 70;
+  player.vy = -7;
+  player.onGround = false;
+  for (let i = 0; i < 12; i++)
+    particles.push({ x: player.x, y: player.feetY - 40, vx: (Math.random()-.5)*6, vy: -Math.random()*4, life: 28, c: '#ff5a5a' });
+  if (player.hp <= 0) endGame();
+}
 charImg.src = 'character.png';
 
 // スプライトシート上の各ポーズ座標 [x, y, w, h]（自動検出済み）
@@ -138,8 +180,8 @@ const JUMP_POWER = -13.5;
 
 // ===== 状態 =====
 let state = 'start';   // start | play | over
-let obstacles = [], coins = [], hills = [], clouds = [], particles = [];
-let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0;
+let obstacles = [], coins = [], hills = [], clouds = [], particles = [], enemies = [];
+let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0, enemyT = 0;
 // localStorage は file:// だと例外になることがあるので安全に扱う
 function loadBest() { try { return +(localStorage.getItem('rungirl_best') || 0); } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem('rungirl_best', v); } catch (e) {} }
@@ -155,9 +197,9 @@ initBg();
 function reset() {
   player.feetY = GROUND; player.vy = 0; player.onGround = true;
   player.jumps = 0; player.hp = 3; player.hurt = 0;
-  obstacles = []; coins = []; particles = [];
+  obstacles = []; coins = []; particles = []; enemies = [];
   speed = 5.2; distance = 0; score = 0; coinCount = 0;
-  spawnT = 60; coinT = 90; animT = 0;
+  spawnT = 60; coinT = 90; animT = 0; enemyT = 140;
 }
 
 function startGame() {
@@ -249,6 +291,11 @@ function update() {
   obstacles.forEach(o => o.x -= speed);
   obstacles = obstacles.filter(o => o.x + o.w > -20);
 
+  // 敵キャラ（少し速く迫ってくる）
+  if (--enemyT <= 0) { enemies.push({ x: W + 40 }); enemyT = Math.max(90, 200 - distance / 300); }
+  enemies.forEach(e => e.x -= speed * 1.18);
+  enemies = enemies.filter(e => e.x + ENEMY_W > -20);
+
   // コイン
   if (--coinT <= 0) { spawnCoin(); coinT = 80 + Math.random()*70; }
   coins.forEach(c => { c.x -= speed; c.spin += 0.2; });
@@ -272,6 +319,11 @@ function update() {
         if (player.hp <= 0) endGame();
         break;
       }
+    }
+  }
+  for (const e of enemies) {
+    if (player.hurt === 0 && hit(px+4, py+4, HIT_W-8, HIT_H-8, e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H)) {
+      takeDamage(); break;
     }
   }
   for (const c of coins) {
@@ -358,6 +410,7 @@ function draw() {
   });
 
   // プレイヤー
+  enemies.forEach(drawEnemy);
   drawPlayer();
 
   // UI
@@ -440,15 +493,19 @@ const MELODY = [
   74,74,69,71, 74,0,71,69,
   67,67,69,71, 69,0,0,0,
   73,73,71,73, 74,0,76,74,
-  71,69,67,69, 69,0,0,0
+  71,69,67,69, 69,0,0,0,
+  69,71,73,74, 76,0,74,73,
+  71,73,74,76, 78,0,76,74,
+  74,76,78,79, 81,0,0,79,
+  78,76,74,73, 74,0,0,0
 ];
-const BASS = [
-  50,0,57,0, 45,0,52,0,
-  43,0,50,0, 45,0,52,0,
-  47,0,54,0, 45,0,52,0,
-  43,0,50,0, 45,0,52,0
+const CHORDS = [
+  [50,57,62],[50,57,62],[43,50,55],[45,52,57],
+  [47,54,59],[43,50,55],[45,52,57],[50,57,62],
+  [50,57,62],[45,52,57],[47,54,59],[43,50,55],
+  [40,47,52],[45,52,57],[50,57,62],[45,52,57]
 ];
-const BGM_STEP_MS = 165;
+const BGM_STEP_MS = 170;
 function tone(f, dur, type, vol) {
   if (!audioCtx || f <= 0) return;
   const t = audioCtx.currentTime;
@@ -461,11 +518,21 @@ function tone(f, dur, type, vol) {
   o.start(t); o.stop(t + dur + 0.05);
 }
 function bgmTick() {
-  const m = MELODY[bgmStep % MELODY.length];
-  tone(midi(m), BGM_STEP_MS / 1000 * 1.3, 'square', 0.10);
-  const b = BASS[bgmStep % BASS.length];
-  tone(midi(b), BGM_STEP_MS / 1000 * 1.3, 'triangle', 0.16);
-  if (m > 0 && bgmStep % 4 === 0) tone(midi(m - 12), BGM_STEP_MS / 1000, 'square', 0.05);
+  const i = bgmStep % MELODY.length;
+  const bar = Math.floor(i / 4);
+  const chord = CHORDS[bar % CHORDS.length];
+  const inBar = i % 4;
+  const m = MELODY[i];
+  if (m > 0) {
+    tone(midi(m), BGM_STEP_MS / 1000 * 1.3, 'square', 0.11);
+    tone(midi(m + 12), BGM_STEP_MS / 1000 * 1.1, 'triangle', 0.05);
+  }
+  const bassNote = (inBar % 2 === 0) ? chord[0] - 12 : chord[1] - 12;
+  tone(midi(bassNote), BGM_STEP_MS / 1000 * 1.4, 'triangle', 0.18);
+  if (inBar === 0) {
+    for (const c of chord) tone(midi(c), BGM_STEP_MS / 1000 * 3.6, 'sine', 0.05);
+    tone(55, 0.16, 'sine', 0.22);
+  }
   bgmStep++;
 }
 function startBGM() {
