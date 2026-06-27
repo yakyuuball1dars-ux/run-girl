@@ -193,7 +193,7 @@ const JUMP_POWER = -13.5;
 // ===== 状態 =====
 let state = 'start';   // start | play | over
 let obstacles = [], coins = [], hills = [], clouds = [], particles = [], enemies = [];
-let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0, enemyT = 0, bonus = 0;
+let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0, enemyT = 0, bonus = 0, kills = 0;
 // localStorage は file:// だと例外になることがあるので安全に扱う
 function loadBest() { try { return +(localStorage.getItem('rungirl_best') || 0); } catch (e) { return 0; } }
 function saveBest(v) { try { localStorage.setItem('rungirl_best', v); } catch (e) {} }
@@ -211,7 +211,7 @@ function reset() {
   player.jumps = 0; player.hp = 3; player.hurt = 0;
   obstacles = []; coins = []; particles = []; enemies = [];
   speed = 5.2; distance = 0; score = 0; coinCount = 0;
-  spawnT = 60; coinT = 90; animT = 0; enemyT = 140; bonus = 0;
+  spawnT = 60; coinT = 90; animT = 0; enemyT = 140; bonus = 0; kills = 0;
 }
 
 function startGame() {
@@ -226,7 +226,7 @@ function endGame() {
   state = 'over';
   if (score > best) { best = score; saveBest(best); }
   overStats.innerHTML =
-    `スコア <b>${score}</b><br>距離 ${Math.floor(distance/10)}m ／ コイン ${coinCount}枚<br>ベスト ${best}`;
+    `スコア <b>${score}</b><br>距離 ${Math.floor(distance/10)}m ／ コイン ${coinCount}枚 ／ 撃破 ${kills}体<br>ベスト ${best}`;
   overScreen.classList.remove('hidden');
 }
 
@@ -337,7 +337,7 @@ function update() {
     if (e.dead) continue;
     if (!hit(px+4, py+4, HIT_W-8, HIT_H-8, e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H)) continue;
     if (player.vy > 0 && player.feetY < GROUND - ENEMY_H + ENEMY_H * 0.6) {
-      e.dead = true; bonus += 30;
+      e.dead = true; bonus += 30; kills++;
       player.vy = -12; player.onGround = false;       // 踏んでバウンド
       sfxStomp();
       for (let k = 0; k < 14; k++)
@@ -493,12 +493,14 @@ function heart(x, y, s, filled) {
 function drawUI() {
   // スコア・距離
   ctx.fillStyle = 'rgba(0,0,0,.35)';
-  ctx.fillRect(12, 12, 190, 58);
+  ctx.fillRect(12, 12, 214, 80);
   ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
   ctx.font = 'bold 22px sans-serif';
   ctx.fillText('★ ' + score, 24, 38);
   ctx.font = '14px sans-serif'; ctx.fillStyle = '#ffe9a8';
   ctx.fillText(`${Math.floor(distance/10)}m ・ 🪙${coinCount} ・ best ${best}`, 24, 58);
+  ctx.fillStyle = '#c7b3ff';
+  ctx.fillText('⚔️ 撃破 ' + kills + ' 体', 24, 76);
 
   // ハート（HP）
   for (let i = 0; i < 3; i++) heart(W - 30 - i*34, 22, 22, i < player.hp);
