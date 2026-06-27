@@ -51,6 +51,12 @@
     font-size: 20px; padding: 6px 12px; cursor: pointer;
   }
   .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  .quiz-q { font-size: clamp(16px,4.6vw,24px); font-weight:800; color:#fff; margin-bottom:14px; max-width:90%; line-height:1.45; }
+  #quizChoices { display:flex; flex-direction:column; gap:9px; width:min(86%,440px); }
+  .quiz-btn { font-size:clamp(14px,4vw,18px); padding:11px 14px; border-radius:10px; border:2px solid #ffd166; background:rgba(0,0,0,.45); color:#fff; cursor:pointer; font-weight:700; }
+  .quiz-btn:hover { background:rgba(255,209,102,.25); }
+  .quiz-btn:disabled { opacity:.7; cursor:default; }
+  .quiz-fb { margin-top:14px; font-size:clamp(13px,3.6vw,17px); min-height:1.4em; color:#ffe9a8; max-width:90%; line-height:1.4; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
   @media (orientation: landscape) and (max-height: 520px) {
     h1 { display: none; }
@@ -72,6 +78,11 @@
       <p class="big pulse">▶ タップでスタート</p>
     </div>
 
+    <div id="quizScreen" class="overlay hidden">
+      <div class="quiz-q" id="quizQ"></div>
+      <div id="quizChoices"></div>
+      <div class="quiz-fb" id="quizFb"></div>
+    </div>
     <div id="overScreen" class="overlay hidden">
       <h2>GAME OVER</h2>
       <p id="overStats" class="big"></p>
@@ -88,6 +99,7 @@ const W = canvas.width, H = canvas.height;
 const GROUND = H - 64;            // 足が着く高さ
 const startScreen = document.getElementById('startScreen');
 const overScreen  = document.getElementById('overScreen');
+const quizScreen  = document.getElementById('quizScreen');
 const overStats   = document.getElementById('overStats');
 
 // ===== キャラ画像（透過済み character.png）=====
@@ -121,6 +133,15 @@ function drawEnemy(e) {
     const fr = ENEMY[Math.floor(animT / 8) % ENEMY.length];
     const bob = Math.abs(Math.sin(animT * 0.3)) * 3;
     drawSprite(enemyImg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false);
+    if (e.ng) {
+      ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      const lw = ctx.measureText(e.ng.n).width + 12;
+      ctx.fillStyle = 'rgba(40,0,60,.78)';
+      ctx.fillRect(e.x + ENEMY_W/2 - lw/2, GROUND - ENEMY_DISP - 2, lw, 18);
+      ctx.fillStyle = '#ff9de0';
+      ctx.fillText(e.ng.n, e.x + ENEMY_W/2, GROUND - ENEMY_DISP + 11);
+      ctx.textAlign = 'left';
+    }
   } else {
     ctx.fillStyle = '#3a2a5a';
     ctx.fillRect(e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H);
@@ -211,7 +232,7 @@ function reset() {
   player.jumps = 0; player.hp = 3; player.hurt = 0;
   obstacles = []; coins = []; particles = []; enemies = [];
   speed = 5.2; distance = 0; score = 0; coinCount = 0;
-  spawnT = 60; coinT = 90; animT = 0; enemyT = 140; bonus = 0; kills = 0;
+  spawnT = 60; coinT = 90; animT = 0; enemyT = 140; bonus = 0; kills = 0; quizDist = 700; banner.timer = 0;
 }
 
 function startGame() {
@@ -238,6 +259,7 @@ function goToTitle() {
 }
 
 function jump() {
+  if (state === 'quiz') return;
   if (state === 'start') { startGame(); return; }
   if (state === 'over')  { goToTitle(); return; }
   if (player.jumps < player.maxJumps) {
@@ -280,6 +302,7 @@ function update() {
 
   distance += speed;
   speed = 5.2 + distance / 2600;
+  if (distance > quizDist) { quizDist += 900 + Math.floor(Math.random()*300); launchQuiz(); return; }
   if (player.hurt > 0) player.hurt--;
 
   // 物理
@@ -304,7 +327,7 @@ function update() {
   obstacles = obstacles.filter(o => o.x + o.w > -20);
 
   // 敵キャラ（少し速く迫ってくる）
-  if (--enemyT <= 0) { enemies.push({ x: W + 40 }); enemyT = Math.max(90, 200 - distance / 300); }
+  if (--enemyT <= 0) { enemies.push({ x: W + 40, ng: NG_LIST[Math.floor(Math.random()*NG_LIST.length)] }); enemyT = Math.max(90, 200 - distance / 300); }
   enemies.forEach(e => e.x -= speed * 1.18);
   enemies = enemies.filter(e => e.x + ENEMY_W > -20);
 
@@ -338,6 +361,7 @@ function update() {
     if (!hit(px+4, py+4, HIT_W-8, HIT_H-8, e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H)) continue;
     if (player.vy > 0 && player.feetY < GROUND - ENEMY_H + ENEMY_H * 0.6) {
       e.dead = true; bonus += 30; kills++;
+      if (e.ng) showBanner('💡 ' + e.ng.n + '：' + e.ng.e, '#c7b3ff');
       player.vy = -12; player.onGround = false;       // 踏んでバウンド
       sfxStomp();
       for (let k = 0; k < 14; k++)
@@ -350,6 +374,7 @@ function update() {
   for (const c of coins) {
     if (hit(px, py, HIT_W, HIT_H, c.x - c.r, c.y - c.r, c.r*2, c.r*2)) {
       c.got = true; coinCount++; score += 10;
+      if (coinCount % 4 === 0) { const tm = TERMS[Math.floor(Math.random()*TERMS.length)]; showBanner('📘 ' + tm.t + '：' + tm.d, '#9fe0ff'); }
       for (let i = 0; i < 6; i++)
         particles.push({ x: c.x, y: c.y, vx: (Math.random()-.5)*4, vy: -Math.random()*3, life: 22, c: '#ffd166' });
     }
@@ -436,6 +461,7 @@ function draw() {
 
   // UI
   drawUI();
+  drawBanner();
 }
 
 function drawPlayer() {
@@ -572,6 +598,91 @@ function toggleBGM() {
   const btn = document.getElementById('soundBtn');
   if (btn) btn.textContent = bgmOn ? '🔊' : '🔇';
   if (bgmOn) startBGM();
+}
+
+// ===== 株式学習：クイズ・用語・NG行動（基本セット。教材に合わせて差し替え可）=====
+const QUIZ = [
+  {q:'PER（株価収益率）が低い銘柄は一般に？', a:['割安', '割高', '無関係'], c:0, e:'PERが低い＝利益に対して株価が割安の目安。'},
+  {q:'ROE（自己資本利益率）が高い会社は？', a:['資本を効率よく使えている', '借金が多い', '株価が必ず上がる'], c:0, e:'ROEは自己資本でどれだけ利益を生むかの指標。'},
+  {q:'分散投資の主な目的は？', a:['リスクを抑える', '手数料を増やす', '税金を減らす'], c:0, e:'1つに集中せず分けることでリスクを下げる。'},
+  {q:'「損切り」とは？', a:['損失が小さいうちに売る', '利益を確定する', '買い増す'], c:0, e:'損失の拡大を防ぐため早めに売ること。'},
+  {q:'ドルコスト平均法とは？', a:['一定額を定期的に買う', '一括で買う', '高い時だけ買う'], c:0, e:'定期定額購入で平均取得単価を平準化する手法。'},
+  {q:'配当利回りの計算は？', a:['年間配当 / 株価', '株価 / 配当', '利益 / 株価'], c:0, e:'配当利回り＝年間配当金 / 株価 ×100（％）。'},
+  {q:'PBRが1倍を下回ると一般に？', a:['解散価値より安い', '割高', '無配'], c:0, e:'PBR<1は株価が純資産（解散価値）を下回る目安。'},
+  {q:'長期投資で活かしたい効果は？', a:['複利', '毎日売買', '借金投資'], c:0, e:'複利＝利益が利益を生む効果。長期で大きくなる。'},
+  {q:'「高値掴み」とは？', a:['高い所で買ってしまう', '安く買う', '配当を得る'], c:0, e:'急騰の天井で買い、その後の下落で損する失敗。'},
+  {q:'成行注文とは？', a:['価格を指定せず即売買', '価格を指定する', '予約する'], c:0, e:'成行は値段を指定せず約定を優先する注文。'},
+  {q:'指値注文とは？', a:['価格を指定して売買', 'すぐ約定する', '自動で売る'], c:0, e:'指値は希望価格を指定する注文。'},
+  {q:'株主優待とは？', a:['株主への特典', '借入金', '税金'], c:0, e:'一定株数の保有で受けられる自社製品や割引など。'}
+];
+const NG_LIST = [
+  {n:'狼狽売り', e:'暴落で慌てて投げ売りしない。'},
+  {n:'高値掴み', e:'急騰の天井で飛びつかない。'},
+  {n:'一点集中', e:'1銘柄に全額はNG。分散しよう。'},
+  {n:'借金投資', e:'生活資金や借金での投資は避ける。'},
+  {n:'売買中毒', e:'頻繁な売買は手数料と判断ミスを増やす。'}
+];
+const TERMS = [
+  {t:'PER', d:'株価収益率。低いほど割安の目安'},
+  {t:'PBR', d:'株価純資産倍率。1倍割れは割安目安'},
+  {t:'ROE', d:'自己資本利益率。資本効率の高さ'},
+  {t:'配当利回り', d:'年間配当/株価。インカム収益の指標'},
+  {t:'損切り', d:'損失を小さいうちに確定する売り'},
+  {t:'分散投資', d:'複数に分けてリスクを抑える'},
+  {t:'複利', d:'利益が利益を生む長期の効果'},
+  {t:'ドルコスト平均法', d:'定期定額購入で取得単価を平準化'},
+  {t:'時価総額', d:'株価 × 発行株数。会社の規模'}
+];
+let banner = { text:'', timer:0, color:'#ffe9a8' };
+let quizDist = 700;
+let currentQuiz = null;
+function showBanner(text, color) { banner.text = text; banner.timer = 150; banner.color = color || '#ffe9a8'; }
+function drawBanner() {
+  if (banner.timer <= 0) return;
+  banner.timer--;
+  ctx.globalAlpha = Math.min(1, banner.timer / 25);
+  ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+  const bw = ctx.measureText(banner.text).width + 28;
+  ctx.fillStyle = 'rgba(20,10,40,.85)';
+  ctx.fillRect(W / 2 - bw / 2, 84, bw, 30);
+  ctx.fillStyle = banner.color;
+  ctx.fillText(banner.text, W / 2, 104);
+  ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+}
+function launchQuiz() {
+  state = 'quiz';
+  currentQuiz = QUIZ[Math.floor(Math.random() * QUIZ.length)];
+  document.getElementById('quizQ').textContent = '📈 ' + currentQuiz.q;
+  document.getElementById('quizFb').textContent = '';
+  const box = document.getElementById('quizChoices');
+  box.innerHTML = '';
+  currentQuiz.a.forEach((txt, idx) => {
+    const b = document.createElement('button');
+    b.className = 'quiz-btn';
+    b.textContent = ['(1)', '(2)', '(3)'][idx] + ' ' + txt;
+    b.onclick = () => answerQuiz(idx);
+    box.appendChild(b);
+  });
+  quizScreen.classList.remove('hidden');
+}
+function answerQuiz(idx) {
+  if (!currentQuiz) return;
+  const ok = idx === currentQuiz.c;
+  const fb = document.getElementById('quizFb');
+  if (ok) {
+    bonus += 50; if (player.hp < 3) player.hp++;
+    fb.style.color = '#86efac'; fb.textContent = '⭕ 正解！ ' + currentQuiz.e;
+  } else {
+    player.hp--;
+    fb.style.color = '#fca5a5'; fb.textContent = '❌ 不正解… 正解は「' + currentQuiz.a[currentQuiz.c] + '」 ' + currentQuiz.e;
+  }
+  Array.prototype.forEach.call(document.getElementById('quizChoices').children, b => b.disabled = true);
+  const dead = player.hp <= 0;
+  setTimeout(() => {
+    quizScreen.classList.add('hidden');
+    currentQuiz = null;
+    if (dead) endGame(); else state = 'play';
+  }, ok ? 1500 : 2700);
 }
 
 function press(e) { if (e && e.preventDefault) e.preventDefault(); holding = true; jump(); }
