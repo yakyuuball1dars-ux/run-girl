@@ -144,15 +144,7 @@ function drawEnemy(e) {
     const fr = efr[Math.floor(animT / 8) % efr.length];
     const bob = Math.abs(Math.sin(animT * 0.3)) * 3;
     drawSprite(eimg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false);
-    if (e.ng) {
-      ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
-      const lw = ctx.measureText(e.ng.n).width + 12;
-      ctx.fillStyle = 'rgba(40,0,60,.78)';
-      ctx.fillRect(e.x + ENEMY_W/2 - lw/2, GROUND - ENEMY_DISP - 36, lw, 18);
-      ctx.fillStyle = '#ff9de0';
-      ctx.fillText(e.ng.n, e.x + ENEMY_W/2, GROUND - ENEMY_DISP - 23);
-      ctx.textAlign = 'left';
-    }
+    // （NGラベルは非表示）
   } else {
     ctx.fillStyle = '#3a2a5a';
     ctx.fillRect(e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H);
