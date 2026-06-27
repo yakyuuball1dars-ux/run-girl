@@ -37,6 +37,11 @@
   .hidden { display: none !important; }
   .pulse { animation: pulse 1.2s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+  @media (orientation: landscape) and (max-height: 520px) {
+    h1 { display: none; }
+    #hint { display: none; }
+    body { justify-content: center; }
+  }
 </style>
 </head>
 <body>
@@ -416,9 +421,12 @@ overScreen.addEventListener('click', () => jump());
 
 // 画面サイズに合わせてキャンバスを拡縮（縦向きでも全体が見えるように）
 function fitCanvas() {
-  const availW = window.innerWidth - 16;
-  const availH = window.innerHeight - 110;
-  const scale = Math.min(availW / W, availH / H, 1);
+  // 横向きで画面が低いときはタイトル等を隠して画面いっぱいに拡大
+  const landscapeShort = window.innerWidth > window.innerHeight && window.innerHeight < 520;
+  const reserve = landscapeShort ? 16 : 110;
+  const availW = window.innerWidth - 12;
+  const availH = window.innerHeight - reserve;
+  const scale = Math.min(availW / W, availH / H, 3);  // 実サイズ超の拡大も許可
   canvas.style.width = Math.round(W * scale) + 'px';
   canvas.style.height = Math.round(H * scale) + 'px';
 }
