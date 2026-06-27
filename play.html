@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Copiaの伝説 ～ラタヒの大冒険～（クイズなし）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    background: radial-gradient(circle at 50% 30%, #2a2a4e, #14142a);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+    color: #fff; overflow: hidden;
+  }
+  h1 { font-size: 20px; margin-bottom: 10px; color: #ffd166; letter-spacing: 1px; }
+  #wrap { position: relative; }
+  canvas {
+    border-radius: 14px;
+    box-shadow: 0 12px 50px rgba(0,0,0,.6);
+    display: block; image-rendering: pixelated;
+    touch-action: none; max-width: 100%;
+  }
+  #hint { margin-top: 12px; font-size: 13px; color: #9a9ac0; }
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(10,10,30,.6);
+    border-radius: 14px; text-align: center; cursor: pointer;
+    backdrop-filter: blur(2px);
+  }
+  .overlay h2 { font-size: 38px; margin-bottom: 6px; color: #ffd166; text-shadow: 0 3px 0 #b8860b; }
+  .overlay p { font-size: 16px; color: #eee; line-height: 1.7; }
+  .overlay .big { font-size: 22px; color: #fff; margin: 10px 0; }
+  .title-main {
+    font-size: clamp(30px, 9vw, 50px); font-weight: 900; color: #ffd166;
+    letter-spacing: 2px; margin-bottom: 2px; line-height: 1.15;
+    text-shadow: 0 0 14px rgba(255,180,0,.55), 0 4px 0 #b8860b, 0 6px 10px rgba(0,0,0,.55);
+  }
+  .title-sub {
+    font-size: clamp(16px, 4.6vw, 24px); font-weight: 700; color: #ffe9a8;
+    margin-bottom: 16px; text-shadow: 0 2px 4px rgba(0,0,0,.5);
+  }
+  .hidden { display: none !important; }
+  #soundBtn {
+    position: fixed; left: 10px; bottom: 10px; z-index: 30;
+    background: rgba(0,0,0,.5); color: #ffd166;
+    border: 1px solid rgba(255,209,102,.5); border-radius: 10px;
+    font-size: 20px; padding: 6px 12px; cursor: pointer;
+  }
+  .pulse { animation: pulse 1.2s ease-in-out infinite; }
+  .mode-link { display:inline-block; margin-top:14px; padding:9px 18px; border-radius:10px; background:rgba(45,108,223,.9); color:#fff; text-decoration:none; font-weight:700; font-size:15px; }
+  .quiz-q { font-size: clamp(16px,4.6vw,24px); font-weight:800; color:#fff; margin-bottom:14px; max-width:90%; line-height:1.45; }
+  #quizChoices { display:flex; flex-direction:column; gap:9px; width:min(86%,440px); }
+  .quiz-btn { font-size:clamp(14px,4vw,18px); padding:11px 14px; border-radius:10px; border:2px solid #ffd166; background:rgba(0,0,0,.45); color:#fff; cursor:pointer; font-weight:700; }
+  .quiz-btn:hover { background:rgba(255,209,102,.25); }
+  .quiz-btn:disabled { opacity:.7; cursor:default; }
+  .quiz-fb { margin-top:14px; font-size:clamp(13px,3.6vw,17px); min-height:1.4em; color:#ffe9a8; max-width:90%; line-height:1.4; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+  @media (orientation: landscape) and (max-height: 520px) {
+    h1 { display: none; }
+    #hint { display: none; }
+    body { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+  <h1>👑 Copiaの伝説 ～ラタヒの大冒険～</h1>
+  <div id="wrap">
+    <canvas id="game" width="880" height="460"></canvas>
+
+    <div id="startScreen" class="overlay">
+      <div class="title-main">Copiaの伝説</div>
+      <div class="title-sub">～ラタヒの大冒険～</div>
+      <p>障害物をジャンプでよけて、コインを集めよう！<br>
+         <b>スペース / クリック / タップ</b> でジャンプ（空中でもう一度押すと二段ジャンプ）</p>
+      <p class="big pulse">▶ タップでスタート</p>
+      <a href="study.html" class="mode-link" onclick="event.stopPropagation()">📖 学習モード（教材で勉強）</a>
+    </div>
+
+    <div id="quizScreen" class="overlay hidden">
+      <div class="quiz-q" id="quizQ"></div>
+      <div id="quizChoices"></div>
+      <div class="quiz-fb" id="quizFb"></div>
+    </div>
+    <div id="overScreen" class="overlay hidden">
+      <h2>GAME OVER</h2>
+      <p id="overStats" class="big"></p>
+      <p class="pulse">タップでタイトルへ戻る</p>
+    </div>
+  </div>
+  <button id="soundBtn" onclick="toggleBGM()" title="BGM ON/OFF">🔊</button>
+  <div id="hint">スペース・クリック・タップ＝ジャンプ ／ 二段ジャンプ可</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const GROUND = H - 64;            // 足が着く高さ
+const startScreen = document.getElementById('startScreen');
+const overScreen  = document.getElementById('overScreen');
+const quizScreen  = document.getElementById('quizScreen');
+const overStats   = document.getElementById('overStats');
+
+// ===== キャラ画像（透過済み character.png）=====
+const charImg = new Image();
+let charLoaded = false;
+charImg.onload = () => charLoaded = true;
+
+// ===== 敵キャラ（ダークスーツの男） =====
+const enemyImg = new Image();
+let enemyReady = false;
+enemyImg.onload = () => enemyReady = true;
+enemyImg.src = 'enemy.png';
+const ENEMY = [[42,605,136,229],[219,605,136,229],[393,605,134,229]]; // 左向き走り3コマ
+const ENEMY_W = 46, ENEMY_H = 78, ENEMY_DISP = 104;
+function drawSprite(img, fr, cx, footY, targetH, flip) {
+  if (!img || !fr) return;
+  const scale = targetH / fr[3];
+  const dw = fr[2] * scale, dh = targetH;
+  const dx = cx - dw / 2, dy = footY - dh;
+  ctx.imageSmoothingEnabled = false;
+  if (flip) {
+    ctx.save(); ctx.translate(cx * 2, 0); ctx.scale(-1, 1);
+    ctx.drawImage(img, fr[0], fr[1], fr[2], fr[3], dx, dy, dw, dh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(img, fr[0], fr[1], fr[2], fr[3], dx, dy, dw, dh);
+  }
+}
+function drawEnemy(e) {
+  if (enemyReady) {
+    const fr = ENEMY[Math.floor(animT / 8) % ENEMY.length];
+    const bob = Math.abs(Math.sin(animT * 0.3)) * 3;
+    drawSprite(enemyImg, fr, e.x + ENEMY_W / 2, GROUND - bob + 2, ENEMY_DISP, false);
+    if (e.ng) {
+      ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      const lw = ctx.measureText(e.ng.n).width + 12;
+      ctx.fillStyle = 'rgba(40,0,60,.78)';
+      ctx.fillRect(e.x + ENEMY_W/2 - lw/2, GROUND - ENEMY_DISP - 2, lw, 18);
+      ctx.fillStyle = '#ff9de0';
+      ctx.fillText(e.ng.n, e.x + ENEMY_W/2, GROUND - ENEMY_DISP + 11);
+      ctx.textAlign = 'left';
+    }
+  } else {
+    ctx.fillStyle = '#3a2a5a';
+    ctx.fillRect(e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H);
+  }
+}
+function sfxStomp() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'square';
+  o.frequency.setValueAtTime(380, t);
+  o.frequency.exponentialRampToValueAtTime(1000, t + 0.12);
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  o.connect(g); g.connect(masterGain);
+  o.start(t); o.stop(t + 0.2);
+}
+function takeDamage() {
+  if (player.hurt > 0) return;
+  player.hp--;
+  player.hurt = 70;
+  player.vy = -7;
+  player.onGround = false;
+  for (let i = 0; i < 12; i++)
+    particles.push({ x: player.x, y: player.feetY - 40, vx: (Math.random()-.5)*6, vy: -Math.random()*4, life: 28, c: '#ff5a5a' });
+  if (player.hp <= 0) endGame();
+}
+charImg.src = 'character.png';
+
+// スプライトシート上の各ポーズ座標 [x, y, w, h]（自動検出済み）
+const SHEET = {
+  idle: [82, 130, 315, 448],
+  run1: [253, 657, 143, 235],
+  run2: [438, 657, 161, 235],
+  run3: [646, 656, 157, 236],
+  jump: [815, 180, 312, 404],
+  hurt: [808, 984, 159, 220]
+};
+const RUN_CYCLE = ['run1', 'run3'];  // 左右のストライド2コマ
+
+// frame を「中心 cx・足元 footY・高さ targetH」で描画
+function drawFrame(name, cx, footY, targetH, flip) {
+  const f = SHEET[name];
+  if (!f) return;
+  const scale = targetH / f[3];
+  const dw = f[2] * scale, dh = targetH;
+  const dx = cx - dw / 2, dy = footY - dh;
+  ctx.imageSmoothingEnabled = false;
+  if (flip) {
+    ctx.save();
+    ctx.translate(cx * 2, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(charImg, f[0], f[1], f[2], f[3], dx, dy, dw, dh);
+    ctx.restore();
+  } else {
+    ctx.drawImage(charImg, f[0], f[1], f[2], f[3], dx, dy, dw, dh);
+  }
+}
+
+// ===== プレイヤー =====
+const HIT_W = 44, HIT_H = 82, DISP_H = 104;
+const player = {
+  x: 150, feetY: GROUND, vy: 0,
+  onGround: true, jumps: 0, maxJumps: 2,
+  hp: 3, hurt: 0
+};
+const GRAVITY = 0.78;
+const JUMP_POWER = -13.5;
+
+// ===== 状態 =====
+let state = 'start';   // start | play | over
+let obstacles = [], coins = [], hills = [], clouds = [], particles = [], enemies = [];
+let speed, distance, score, coinCount, spawnT, coinT, holding, animT = 0, enemyT = 0, bonus = 0, kills = 0;
+// localStorage は file:// だと例外になることがあるので安全に扱う
+function loadBest() { try { return +(localStorage.getItem('rungirl_best') || 0); } catch (e) { return 0; } }
+function saveBest(v) { try { localStorage.setItem('rungirl_best', v); } catch (e) {} }
+let best = loadBest();
+
+function initBg() {
+  hills = []; clouds = [];
+  for (let i = 0; i < 6; i++) hills.push({ x: i * 180, h: 60 + Math.random() * 60 });
+  for (let i = 0; i < 5; i++) clouds.push({ x: Math.random() * W, y: 30 + Math.random() * 120, s: 0.3 + Math.random() * 0.6 });
+}
+initBg();
+
+function reset() {
+  player.feetY = GROUND; player.vy = 0; player.onGround = true;
+  player.jumps = 0; player.hp = 3; player.hurt = 0;
+  obstacles = []; coins = []; particles = []; enemies = [];
+  speed = 5.2; distance = 0; score = 0; coinCount = 0;
+  spawnT = 60; coinT = 90; animT = 0; enemyT = 140; bonus = 0; kills = 0; quizDist = 700; banner.timer = 0;
+}
+
+function startGame() {
+  reset();
+  state = 'play';
+  startScreen.classList.add('hidden');
+  startBGM();
+  overScreen.classList.add('hidden');
+}
+
+function endGame() {
+  state = 'over';
+  if (score > best) { best = score; saveBest(best); }
+  overStats.innerHTML =
+    `スコア <b>${score}</b><br>距離 ${Math.floor(distance/10)}m ／ コイン ${coinCount}枚 ／ 撃破 ${kills}体<br>ベスト ${best}`;
+  overScreen.classList.remove('hidden');
+}
+
+function goToTitle() {
+  reset();
+  state = 'start';
+  overScreen.classList.add('hidden');
+  startScreen.classList.remove('hidden');
+}
+
+function jump() {
+  if (state === 'quiz') return;
+  if (state === 'start') { startGame(); return; }
+  if (state === 'over')  { goToTitle(); return; }
+  if (player.jumps < player.maxJumps) {
+    player.vy = JUMP_POWER;
+    player.onGround = false;
+    player.jumps++;
+    // ジャンプ砂煙
+    for (let i = 0; i < 6; i++)
+      particles.push({ x: player.x, y: player.feetY, vx: -2 - Math.random()*2, vy: -Math.random()*2, life: 20, c: '#fff' });
+  }
+}
+
+// ===== 生成 =====
+function spawnObstacle() {
+  const types = ['rock', 'spike', 'tall'];
+  const t = types[Math.floor(Math.random() * types.length)];
+  const h = t === 'tall' ? 64 : (t === 'spike' ? 34 : 40);
+  const w = t === 'tall' ? 28 : 40;
+  obstacles.push({ x: W + 40, w, h, t });
+}
+function spawnCoin() {
+  const high = Math.random() < 0.5;
+  const baseY = high ? GROUND - 110 : GROUND - 40;
+  const n = 1 + Math.floor(Math.random() * 3);
+  for (let i = 0; i < n; i++)
+    coins.push({ x: W + 40 + i * 34, y: baseY, r: 11, got: false, spin: Math.random()*6 });
+}
+
+function hit(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+}
+
+// ===== 更新 =====
+function update() {
+  animT++;
+  // 雲は常に流れる
+  clouds.forEach(c => { c.x -= c.s; if (c.x < -90) { c.x = W + 50; c.y = 30 + Math.random()*120; } });
+
+  if (state !== 'play') return;
+
+  distance += speed;
+  speed = 5.2 + distance / 2600;
+  // （クイズなしバージョン：出題トリガー無効）
+  if (player.hurt > 0) player.hurt--;
+
+  // 物理
+  player.vy += GRAVITY * (holding && player.vy < 0 ? 0.6 : 1);
+  player.feetY += player.vy;
+  if (player.feetY >= GROUND) {
+    player.feetY = GROUND; player.vy = 0;
+    player.onGround = true; player.jumps = 0;
+  }
+
+  // 走り砂煙
+  if (player.onGround && animT % 10 === 0) {
+    particles.push({ x: player.x - 16, y: GROUND, vx: -2 - Math.random()*1.5, vy: -Math.random()*1.2, life: 16, c: '#cbb78f' });
+  }
+
+  // 丘（パララックス）
+  hills.forEach(hl => { hl.x -= speed * 0.3; if (hl.x < -180) { hl.x += 180 * hills.length; hl.h = 60 + Math.random()*60; } });
+
+  // 障害物
+  if (--spawnT <= 0) { spawnObstacle(); spawnT = Math.max(48, 105 - distance/350); }
+  obstacles.forEach(o => o.x -= speed);
+  obstacles = obstacles.filter(o => o.x + o.w > -20);
+
+  // 敵キャラ（少し速く迫ってくる）
+  if (--enemyT <= 0) { enemies.push({ x: W + 40, ng: NG_LIST[Math.floor(Math.random()*NG_LIST.length)] }); enemyT = Math.max(90, 200 - distance / 300); }
+  enemies.forEach(e => e.x -= speed * 1.18);
+  enemies = enemies.filter(e => e.x + ENEMY_W > -20);
+
+  // コイン
+  if (--coinT <= 0) { spawnCoin(); coinT = 80 + Math.random()*70; }
+  coins.forEach(c => { c.x -= speed; c.spin += 0.2; });
+  coins = coins.filter(c => c.x > -30 && !c.got);
+
+  // パーティクル
+  particles.forEach(p => { p.x -= speed*0.5; p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life--; });
+  particles = particles.filter(p => p.life > 0);
+
+  // 当たり判定
+  const px = player.x - HIT_W/2, py = player.feetY - HIT_H;
+  if (player.hurt === 0) {
+    for (const o of obstacles) {
+      if (hit(px+4, py+4, HIT_W-8, HIT_H-8, o.x, GROUND - o.h, o.w, o.h)) {
+        player.hp--;
+        player.hurt = 70;           // 無敵時間
+        player.vy = -7;             // 軽くノックバック
+        player.onGround = false;
+        for (let i = 0; i < 12; i++)
+          particles.push({ x: player.x, y: player.feetY - 40, vx: (Math.random()-.5)*6, vy: -Math.random()*4, life: 28, c: '#ff5a5a' });
+        if (player.hp <= 0) endGame();
+        break;
+      }
+    }
+  }
+  for (const e of enemies) {
+    if (e.dead) continue;
+    if (!hit(px+4, py+4, HIT_W-8, HIT_H-8, e.x, GROUND - ENEMY_H, ENEMY_W, ENEMY_H)) continue;
+    if (player.vy > 0 && player.feetY < GROUND - ENEMY_H + ENEMY_H * 0.6) {
+      e.dead = true; bonus += 30; kills++;
+      if (e.ng) showBanner('💡 ' + e.ng.n + '：' + e.ng.e, '#c7b3ff');
+      player.vy = -12; player.onGround = false;       // 踏んでバウンド
+      sfxStomp();
+      for (let k = 0; k < 14; k++)
+        particles.push({ x: e.x + ENEMY_W/2, y: GROUND - ENEMY_H, vx: (Math.random()-.5)*6, vy: -Math.random()*4, life: 26, c: '#b070ff' });
+    } else if (player.hurt === 0) {
+      takeDamage();
+    }
+  }
+  enemies = enemies.filter(e => !e.dead);
+  for (const c of coins) {
+    if (hit(px, py, HIT_W, HIT_H, c.x - c.r, c.y - c.r, c.r*2, c.r*2)) {
+      c.got = true; coinCount++; score += 10;
+      if (coinCount % 4 === 0) { const tm = TERMS[Math.floor(Math.random()*TERMS.length)]; showBanner('📘 ' + tm.t + '：' + tm.d, '#9fe0ff'); }
+      for (let i = 0; i < 6; i++)
+        particles.push({ x: c.x, y: c.y, vx: (Math.random()-.5)*4, vy: -Math.random()*3, life: 22, c: '#ffd166' });
+    }
+  }
+  score = coinCount * 10 + bonus + Math.floor(distance / 10);
+}
+
+// ===== 描画 =====
+function draw() {
+  // 空
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#8ed6ff'); g.addColorStop(0.7, '#cdeeff'); g.addColorStop(1, '#e8f7ff');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  // 太陽
+  ctx.fillStyle = 'rgba(255,240,180,.9)';
+  ctx.beginPath(); ctx.arc(W - 90, 80, 38, 0, Math.PI*2); ctx.fill();
+
+  // 雲
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  clouds.forEach(c => {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 22, 0, Math.PI*2);
+    ctx.arc(c.x+24, c.y+6, 17, 0, Math.PI*2);
+    ctx.arc(c.x-22, c.y+6, 15, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // 丘
+  hills.forEach(hl => {
+    ctx.fillStyle = '#9bd17a';
+    ctx.beginPath();
+    ctx.moveTo(hl.x - 90, GROUND);
+    ctx.quadraticCurveTo(hl.x, GROUND - hl.h, hl.x + 90, GROUND);
+    ctx.fill();
+  });
+
+  // 地面
+  ctx.fillStyle = '#6ab04c'; ctx.fillRect(0, GROUND, W, H - GROUND);
+  ctx.fillStyle = '#56933c'; ctx.fillRect(0, GROUND, W, 7);
+  ctx.fillStyle = '#5a3a22';  ctx.fillRect(0, GROUND + 26, W, H - GROUND - 26);
+  ctx.fillStyle = 'rgba(255,255,255,.10)';
+  const off = (distance) % 44;
+  for (let x = -off; x < W; x += 44) ctx.fillRect(x, GROUND + 12, 22, 5);
+
+  // コイン
+  coins.forEach(c => {
+    const sw = Math.abs(Math.cos(c.spin)) * c.r + 2;
+    ctx.fillStyle = '#ffd166'; ctx.strokeStyle = '#d49a00'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, sw, c.r, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff3c4';
+    ctx.beginPath(); ctx.ellipse(c.x - sw*0.3, c.y - c.r*0.3, sw*0.25, c.r*0.4, 0, 0, Math.PI*2); ctx.fill();
+  });
+
+  // 障害物
+  obstacles.forEach(o => {
+    const oy = GROUND - o.h;
+    if (o.t === 'spike') {
+      ctx.fillStyle = '#b0392b';
+      const n = Math.max(1, Math.floor(o.w / 14));
+      for (let i = 0; i < n; i++) {
+        const sx = o.x + i * (o.w/n);
+        ctx.beginPath(); ctx.moveTo(sx, GROUND); ctx.lineTo(sx + (o.w/n)/2, oy); ctx.lineTo(sx + o.w/n, GROUND); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = o.t === 'tall' ? '#7d5a3a' : '#8a8a8a';
+      ctx.fillRect(o.x, oy, o.w, o.h);
+      ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(o.x, oy, o.w, 6);
+      ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(o.x, GROUND - 6, o.w, 6);
+    }
+  });
+
+  // パーティクル
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life / 28);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(p.x, p.y, 4, 4);
+    ctx.globalAlpha = 1;
+  });
+
+  // プレイヤー
+  enemies.forEach(drawEnemy);
+  drawPlayer();
+
+  // UI
+  drawUI();
+  drawBanner();
+}
+
+function drawPlayer() {
+  let frame, footY = player.feetY, flip = false, lean = false;
+  let shakeX = 0, alpha = 1;
+
+  if (state === 'over') {
+    frame = 'hurt';
+  } else if (state === 'play' && player.hurt > 0) {
+    frame = 'hurt';                                          // 被弾中は痛がるポーズ
+    shakeX = Math.sin(animT * 0.9) * 3;                      // ぷるぷる震える
+    if (Math.floor(player.hurt / 5) % 2 === 0) alpha = 0.45; // 無敵中の点滅
+  } else if (state === 'start') {
+    frame = 'idle';
+  } else if (!player.onGround) {
+    frame = 'jump';
+  } else {
+    frame = RUN_CYCLE[Math.floor(animT / 9) % RUN_CYCLE.length];  // ゆったりした足運び
+    flip = true; lean = true;
+    footY = player.feetY - Math.abs(Math.sin(animT * 0.35)) * 3;  // 控えめな上下動
+  }
+
+  if (charLoaded) {
+    ctx.globalAlpha = alpha;
+    if (lean) {
+      ctx.save();
+      ctx.translate(player.x, footY);
+      ctx.rotate(0.05);                 // ゆるい前傾
+      ctx.translate(-player.x, -footY);
+      drawFrame(frame, player.x + shakeX, footY + 2, DISP_H, flip);
+      ctx.restore();
+    } else {
+      drawFrame(frame, player.x + shakeX, footY + 2, DISP_H, flip);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    // フォールバック（画像未読込）
+    ctx.fillStyle = '#2d6cdf';
+    ctx.fillRect(player.x - HIT_W/2, player.feetY - HIT_H, HIT_W, HIT_H);
+  }
+
+}
+
+function heart(x, y, s, filled) {
+  ctx.fillStyle = filled ? '#ff5a7a' : 'rgba(0,0,0,.25)';
+  ctx.beginPath();
+  ctx.moveTo(x, y + s*0.3);
+  ctx.bezierCurveTo(x, y, x - s*0.5, y, x - s*0.5, y + s*0.3);
+  ctx.bezierCurveTo(x - s*0.5, y + s*0.6, x, y + s*0.85, x, y + s);
+  ctx.bezierCurveTo(x, y + s*0.85, x + s*0.5, y + s*0.6, x + s*0.5, y + s*0.3);
+  ctx.bezierCurveTo(x + s*0.5, y, x, y, x, y + s*0.3);
+  ctx.fill();
+}
+
+function drawUI() {
+  // スコア・距離
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  ctx.fillRect(12, 12, 214, 80);
+  ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+  ctx.font = 'bold 22px sans-serif';
+  ctx.fillText('★ ' + score, 24, 38);
+  ctx.font = '14px sans-serif'; ctx.fillStyle = '#ffe9a8';
+  ctx.fillText(`${Math.floor(distance/10)}m ・ 🪙${coinCount} ・ best ${best}`, 24, 58);
+  ctx.fillStyle = '#c7b3ff';
+  ctx.fillText('⚔️ 撃破 ' + kills + ' 体', 24, 76);
+
+  // ハート（HP）
+  for (let i = 0; i < 3; i++) heart(W - 30 - i*34, 22, 22, i < player.hp);
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+// ===== 入力 =====
+// ===== BGM：ゼルダ風の冒険的オリジナル曲（著作権回避のため完全オリジナル）=====
+let audioCtx = null, masterGain = null, bgmTimer = null, bgmStep = 0, bgmOn = true;
+function midi(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+const MELODY = [
+  69,69,69,74, 74,74,0,74,
+  76,74,73,74, 69,0,0,0,
+  69,69,69,76, 76,76,0,74,
+  78,76,74,73, 74,0,0,0,
+  74,76,78,79, 81,0,79,78,
+  79,78,76,74, 76,0,0,0,
+  78,78,76,74, 73,74,76,78,
+  74,0,69,0, 74,0,0,0
+];
+const CHORDS = [
+  [50,57,62],[50,57,62],[45,52,57],[50,57,62],
+  [50,57,62],[50,57,62],[45,52,57],[50,57,62],
+  [43,50,55],[50,57,62],[45,52,57],[50,57,62],
+  [47,54,59],[43,50,55],[45,52,57],[50,57,62]
+];
+const BGM_STEP_MS = 140;
+function tone(f, dur, type, vol) {
+  if (!audioCtx || f <= 0) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(masterGain);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+function bgmTick() {
+  const i = bgmStep % MELODY.length;
+  const bar = Math.floor(i / 4);
+  const chord = CHORDS[bar % CHORDS.length];
+  const inBar = i % 4;
+  const m = MELODY[i];
+  if (m > 0) {
+    tone(midi(m), BGM_STEP_MS / 1000 * 1.15, 'square', 0.12);
+    tone(midi(m + 12), BGM_STEP_MS / 1000 * 0.9, 'triangle', 0.045);
+  }
+  const bassNote = (inBar % 2 === 0) ? chord[0] - 12 : chord[1] - 12;
+  tone(midi(bassNote), BGM_STEP_MS / 1000 * 1.2, 'triangle', 0.17);
+  if (inBar === 0) { for (const c of chord) tone(midi(c), BGM_STEP_MS / 1000 * 3.0, 'sine', 0.05); }
+  if (inBar % 2 === 0) tone(55, 0.14, 'sine', 0.22);
+  bgmStep++;
+}
+function startBGM() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = bgmOn ? 0.45 : 0;
+    masterGain.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (!bgmTimer) { bgmStep = 0; bgmTimer = setInterval(bgmTick, BGM_STEP_MS); }
+}
+function toggleBGM() {
+  bgmOn = !bgmOn;
+  if (masterGain) masterGain.gain.value = bgmOn ? 0.45 : 0;
+  const btn = document.getElementById('soundBtn');
+  if (btn) btn.textContent = bgmOn ? '🔊' : '🔇';
+  if (bgmOn) startBGM();
+}
+
+// ===== 株式学習：クイズ・用語・NG行動（基本セット。教材に合わせて差し替え可）=====
+const QUIZ = [
+  {q:'株式会社が株式を発行する目的は？', a:['資金調達のため','節税のため','借金返済のため'], c:0, e:'事業資金を投資家から集めるために発行する。'},
+  {q:'株主の立場は？', a:['会社のオーナー','ただの従業員','貸し手だけ'], c:0, e:'株主は会社の所有者で、配当などの権利を持つ。'},
+  {q:'利益の一部を株主に分配するお金は？', a:['配当金','売上高','内部留保'], c:0, e:'残りは内部留保として社内に蓄える。'},
+  {q:'上場株式の売買単位は原則？', a:['100株','1株','1000株'], c:0, e:'原則100株。単元未満株なら1株でも買える。'},
+  {q:'利回りの計算は？', a:['年間リターン÷元本×100','元本÷リターン','リターン÷株価'], c:0, e:'元本に対する1年のリターンの割合。'},
+  {q:'複利とは？', a:['利息を元本に加え再投資','非課税の制度','一括投資のこと'], c:0, e:'再投資で雪だるま式に増える効果。'},
+  {q:'確定申告の手間を省ける口座は？', a:['特定口座(源泉徴収あり)','一般口座','源泉徴収なし特定口座'], c:0, e:'証券会社が税計算・納税を代行する。'},
+  {q:'株式の利益にかかる税率は約？', a:['20.315%','10%','30%'], c:0, e:'所得税等15.315%＋住民税5%。'},
+  {q:'NISAの特徴は？', a:['利益が非課税','手数料が無料','元本保証'], c:0, e:'売却益・配当が非課税になる制度。'},
+  {q:'新NISAの非課税総枠は？', a:['1,800万円','800万円','600万円'], c:0, e:'うち成長投資枠は1,200万円まで。'}
+];
+const NG_LIST = [
+  {n:'高値掴み', e:'急騰の天井で飛びつかない。'},
+  {n:'狼狽売り', e:'暴落で慌てて投げ売りしない。'},
+  {n:'一点集中', e:'1銘柄に全額はNG。分散しよう。'},
+  {n:'他人名義取引', e:'借名・仮名取引は禁止。口座は本人で。'},
+  {n:'一般口座を選ぶ', e:'通常はメリット薄。特定口座が便利。'}
+];
+const TERMS = [
+  {t:'配当金', d:'利益の一部を株主に分配するお金'},
+  {t:'利回り', d:'元本に対する1年のリターン割合(%)'},
+  {t:'複利', d:'利息を元本に加え再投資して増やす'},
+  {t:'単元株', d:'売買の基本単位。原則100株'},
+  {t:'単元未満株', d:'1株や金額指定で少額購入できる株'},
+  {t:'特定口座', d:'源泉徴収ありなら確定申告不要'},
+  {t:'税率20.315%', d:'株式の利益にかかる税金'},
+  {t:'NISA', d:'利益が非課税になる制度'},
+  {t:'成長投資枠', d:'年240万円。株式・ETF等に投資可'},
+  {t:'株式数比例配分方式', d:'NISAで配当を非課税にする受取方式'}
+];
+let banner = { text:'', timer:0, color:'#ffe9a8' };
+let quizDist = 700;
+let currentQuiz = null;
+function showBanner(text, color) { banner.text = text; banner.timer = 150; banner.color = color || '#ffe9a8'; }
+function drawBanner() {
+  if (banner.timer <= 0) return;
+  banner.timer--;
+  ctx.globalAlpha = Math.min(1, banner.timer / 25);
+  ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+  const bw = ctx.measureText(banner.text).width + 28;
+  ctx.fillStyle = 'rgba(20,10,40,.85)';
+  ctx.fillRect(W / 2 - bw / 2, 84, bw, 30);
+  ctx.fillStyle = banner.color;
+  ctx.fillText(banner.text, W / 2, 104);
+  ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+}
+function launchQuiz() {
+  state = 'quiz';
+  currentQuiz = QUIZ[Math.floor(Math.random() * QUIZ.length)];
+  document.getElementById('quizQ').textContent = '📈 ' + currentQuiz.q;
+  document.getElementById('quizFb').textContent = '';
+  const box = document.getElementById('quizChoices');
+  box.innerHTML = '';
+  currentQuiz.a.forEach((txt, idx) => {
+    const b = document.createElement('button');
+    b.className = 'quiz-btn';
+    b.textContent = ['(1)', '(2)', '(3)'][idx] + ' ' + txt;
+    b.onclick = () => answerQuiz(idx);
+    box.appendChild(b);
+  });
+  quizScreen.classList.remove('hidden');
+}
+function answerQuiz(idx) {
+  if (!currentQuiz) return;
+  const ok = idx === currentQuiz.c;
+  const fb = document.getElementById('quizFb');
+  if (ok) {
+    bonus += 50; if (player.hp < 3) player.hp++;
+    fb.style.color = '#86efac'; fb.textContent = '⭕ 正解！ ' + currentQuiz.e;
+  } else {
+    player.hp--;
+    fb.style.color = '#fca5a5'; fb.textContent = '❌ 不正解… 正解は「' + currentQuiz.a[currentQuiz.c] + '」 ' + currentQuiz.e;
+  }
+  Array.prototype.forEach.call(document.getElementById('quizChoices').children, b => b.disabled = true);
+  const dead = player.hp <= 0;
+  setTimeout(() => {
+    quizScreen.classList.add('hidden');
+    currentQuiz = null;
+    if (dead) endGame(); else state = 'play';
+  }, ok ? 1500 : 2700);
+}
+
+function press(e) { if (e && e.preventDefault) e.preventDefault(); holding = true; jump(); }
+function release() { holding = false; }
+window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') press(e); });
+window.addEventListener('keydown', e => { if (e.code === 'KeyM') toggleBGM(); });
+window.addEventListener('keyup',   e => { if (e.code === 'Space' || e.code === 'ArrowUp') release(); });
+canvas.addEventListener('mousedown', press);
+window.addEventListener('mouseup', release);
+canvas.addEventListener('touchstart', press, { passive: false });
+window.addEventListener('touchend', release);
+startScreen.addEventListener('click', () => jump());
+overScreen.addEventListener('click', () => jump());
+
+// 画面サイズに合わせてキャンバスを拡縮（縦向きでも全体が見えるように）
+function fitCanvas() {
+  // 横向きで画面が低いときはタイトル等を隠して画面いっぱいに拡大
+  const landscapeShort = window.innerWidth > window.innerHeight && window.innerHeight < 520;
+  const reserve = landscapeShort ? 16 : 110;
+  const availW = window.innerWidth - 12;
+  const availH = window.innerHeight - reserve;
+  const scale = Math.min(availW / W, availH / H, 3);  // 実サイズ超の拡大も許可
+  canvas.style.width = Math.round(W * scale) + 'px';
+  canvas.style.height = Math.round(H * scale) + 'px';
+}
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', fitCanvas);
+fitCanvas();
+
+loop();
+</script>
+</body>
+</html>
