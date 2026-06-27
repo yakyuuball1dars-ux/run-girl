@@ -148,9 +148,9 @@ function drawEnemy(e) {
       ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
       const lw = ctx.measureText(e.ng.n).width + 12;
       ctx.fillStyle = 'rgba(40,0,60,.78)';
-      ctx.fillRect(e.x + ENEMY_W/2 - lw/2, GROUND - ENEMY_DISP - 22, lw, 18);
+      ctx.fillRect(e.x + ENEMY_W/2 - lw/2, GROUND - ENEMY_DISP - 36, lw, 18);
       ctx.fillStyle = '#ff9de0';
-      ctx.fillText(e.ng.n, e.x + ENEMY_W/2, GROUND - ENEMY_DISP - 9);
+      ctx.fillText(e.ng.n, e.x + ENEMY_W/2, GROUND - ENEMY_DISP - 23);
       ctx.textAlign = 'left';
     }
   } else {
