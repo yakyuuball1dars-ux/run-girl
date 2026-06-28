@@ -687,7 +687,7 @@ function answerQuiz(idx) {
   }, ok ? 1500 : 2700);
 }
 
-function press(e) { if (e && e.preventDefault) e.preventDefault(); holding = true; jump(); }
+function press(e) { if (e && e.target && e.target.closest && e.target.closest('button, a')) return; if (e && e.preventDefault) e.preventDefault(); holding = true; jump(); }
 function release() { holding = false; }
 window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') press(e); });
 window.addEventListener('keydown', e => { if (e.code === 'KeyM') toggleBGM(); });
@@ -707,12 +707,10 @@ function unlockAudio() {
 }
 ['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(ev => window.addEventListener(ev, unlockAudio, { passive: true }));
 window.addEventListener('keyup',   e => { if (e.code === 'Space' || e.code === 'ArrowUp') release(); });
-canvas.addEventListener('mousedown', press);
+window.addEventListener('mousedown', press);
 window.addEventListener('mouseup', release);
-canvas.addEventListener('touchstart', press, { passive: false });
+window.addEventListener('touchstart', press, { passive: false });
 window.addEventListener('touchend', release);
-startScreen.addEventListener('click', () => jump());
-overScreen.addEventListener('click', () => jump());
 
 // 画面サイズに合わせてキャンバスを拡縮（縦向きでも全体が見えるように）
 function fitCanvas() {
