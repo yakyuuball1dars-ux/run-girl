@@ -691,6 +691,21 @@ function press(e) { if (e && e.preventDefault) e.preventDefault(); holding = tru
 function release() { holding = false; }
 window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') press(e); });
 window.addEventListener('keydown', e => { if (e.code === 'KeyM') toggleBGM(); });
+// モバイルの音声アンロック（初回タップで AudioContext を起動）
+let _audioUnlocked = false;
+function unlockAudio() {
+  if (_audioUnlocked) return;
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = bgmOn ? 0.45 : 0;
+    masterGain.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  try { const b = audioCtx.createBuffer(1, 1, 22050); const s = audioCtx.createBufferSource(); s.buffer = b; s.connect(audioCtx.destination); s.start(0); } catch (e) {}
+  _audioUnlocked = true;
+}
+['touchstart', 'touchend', 'mousedown', 'keydown'].forEach(ev => window.addEventListener(ev, unlockAudio, { passive: true }));
 window.addEventListener('keyup',   e => { if (e.code === 'Space' || e.code === 'ArrowUp') release(); });
 canvas.addEventListener('mousedown', press);
 window.addEventListener('mouseup', release);
